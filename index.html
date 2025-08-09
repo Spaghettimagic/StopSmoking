@@ -1,0 +1,436 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0b0f14">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0f14">
+<title>CigTracker — Mobile</title>
+<style>
+:root{
+  --bg:#0b0f14; --card:#111722; --ink:#e9eef5; --muted:#9fb0c3; --line:#1f2a38; --acc:#22d3ee; --fab:#2dd4bf; --warn:#ffb020;
+  --radius:14px; --shadow:0 8px 24px rgba(0,0,0,.35);
+  --pad:clamp(10px,2.5vw,16px);
+  --tap:48px;
+  --safe-b: env(safe-area-inset-bottom);
+  --safe-t: env(safe-area-inset-top);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:clamp(14px,2.8vw,16px)}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0d1420, #0d1420cc 70%, transparent);backdrop-filter:saturate(1.2) blur(4px);padding:calc(var(--pad)/1.5) var(--pad);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:clamp(16px,4.2vw,20px);font-weight:700}
+.small{color:var(--muted);font-size:.9em}
+main{padding:var(--pad);padding-bottom:calc(84px + var(--safe-b));max-width:1000px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:72px;display:flex;flex-direction:column;justify-content:center}
+.kpi .v{font-size:clamp(18px,5.5vw,24px);font-weight:800;letter-spacing:.2px}
+.kpi .l{font-size:.9em;color:var(--muted)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad)}
+.tabs{display:flex;gap:8px;margin:12px 0}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;height:var(--tap);background:#0e1520;color:var(--ink)}
+.tab[aria-selected="true"]{outline:2px solid var(--acc);background:#0f1928}
+.section{display:none}
+.section.active{display:block}
+
+canvas{width:100%;height:260px;background:#0d1420;border:1px solid var(--line);border-radius:12px}
+@media (min-width:700px){ canvas{height:340px} }
+
+.table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:60vh;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:520px;background:#0d1420}
+th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+th{color:var(--muted);position:sticky;top:0;background:#0e1624;z-index:1}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+input,button,select{height:var(--tap);padding:0 12px;border-radius:10px;border:1px solid var(--line);background:#0f1624;color:var(--ink)}
+button.primary{background:var(--acc);color:#05222a;border:0;font-weight:700}
+button.ghost{background:#0e1520}
+a.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:var(--tap);padding:0 14px;border-radius:10px;border:1px solid var(--line);text-decoration:none;color:var(--ink);background:#0e1520}
+
+.fabbar{position:fixed;left:0;right:0;bottom:0;padding:8px max(var(--pad), env(safe-area-inset-left)) calc(8px + var(--safe-b)) max(var(--pad), env(safe-area-inset-left));
+         background:linear-gradient(180deg,transparent,#0b0f14 30%);z-index:20}
+.fab{display:flex;gap:8px}
+.fab input{flex:1;min-width:0}
+.fab .do{min-width:46%; background:var(--fab); color:#06261f; border:0; font-weight:800}
+.tagbar{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.tag{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#0e1520;color:var(--ink);font-size:.92em}
+
+footer{color:var(--muted);text-align:center;padding:24px}
+
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<header>
+  <h1>CigTracker — Mobile</h1>
+  <div class="small">Tutto locale nel tuo browser. Importa/Esporta per backup o sincronizzazione.</div>
+</header>
+
+<main>
+  <section class="grid" id="kpis">
+    <div class="kpi"><div class="v" id="kpi_today">—</div><div class="l">Oggi</div></div>
+    <div class="kpi"><div class="v" id="kpi_since">—</div><div class="l">Dall'ultima</div></div>
+    <div class="kpi"><div class="v" id="kpi_mean">—</div><div class="l">Media/die (ultimi <span id="kpi_range_days">30</span>g)</div></div>
+    <div class="kpi"><div class="v" id="kpi_avg">—</div><div class="l">Intervallo medio</div></div>
+    <div class="kpi"><div class="v" id="kpi_median">—</div><div class="l">Intervallo mediano</div></div>
+    <div class="kpi"><div class="v" id="kpi_total">—</div><div class="l">Totale</div></div>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tabCharts" aria-selected="true">Grafici</button>
+    <button class="tab" role="tab" id="tabTable" aria-selected="false">Tabella</button>
+    <button class="tab" role="tab" id="tabIO" aria-selected="false">Import/Export</button>
+  </div>
+
+  <section id="secCharts" class="section active card">
+    <div class="toolbar">
+      <label>Intervallo analisi: <input id="rangeDays" type="range" min="7" max="180" value="30" step="1" style="width:160px"></label>
+      <span class="small" id="labelDays">30 giorni</span>
+      <button id="btnRecalc" class="ghost">Ricalcola</button>
+    </div>
+    <div style="display:grid; gap:12px;">
+      <div>
+        <div class="small">Sigarette per giorno</div>
+        <canvas id="chartDaily" width="900" height="260"></canvas>
+      </div>
+      <div>
+        <div class="small">Intervallo tra sigarette (min)</div>
+        <canvas id="chartIntervals" width="900" height="260"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section id="secTable" class="section card">
+    <div class="toolbar">
+      <label>Da <input type="date" id="fromDate"></label>
+      <label>A <input type="date" id="toDate"></label>
+      <button id="btnFilter" class="ghost">Filtra</button>
+      <button id="btnClear" class="ghost">Pulisci</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tbl">
+        <thead><tr><th>Data</th><th>Ora</th><th>Nota</th><th>Min. dalla precedente</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="secIO" class="section card">
+    <div class="toolbar">
+      <input type="file" id="fileInput" style="flex:1;min-width:0">
+      <button id="btnImport" class="primary">Importa</button>
+    </div>
+    <div class="toolbar">
+      <a id="dlCsv" class="btn" download="cigarette_log.csv">CSV</a>
+      <a id="dlJson" class="btn" download="cigarette_log.json">JSON</a>
+      <a id="dlTxt" class="btn" download="cigarette_log.txt">TXT</a>
+      <a id="dlMd" class="btn" download="cigarette_log.md">MD</a>
+      <button id="btnPersist" class="ghost" title="Salva nel LocalStorage">Persisti</button>
+      <button id="btnRestore" class="ghost" title="Ripristina snapshot iniziale">Ripristina</button>
+    </div>
+    <div class="small">iOS: se un file scaricato si apre in anteprima, usa Condividi → Salva su File.</div>
+  </section>
+
+  <footer class="small">Versione mobile. Nessuna libreria esterna. </footer>
+</main>
+
+<!-- Quick‑add bar -->
+<div class="fabbar" role="region" aria-label="Aggiungi rapida">
+  <div class="fab">
+    <input id="note" placeholder="Nota (es. '100s', 'post pranzo')" inputmode="latin" autocomplete="off" />
+    <button class="do" id="btnAdd">+ Registra</button>
+  </div>
+  <div class="tagbar" id="tagbar">
+    <button class="tag" data-tag="100s">100s</button>
+    <button class="tag" data-tag="pre riunione">pre riunione</button>
+    <button class="tag" data-tag="post pranzo">post pranzo</button>
+  </div>
+</div>
+
+<script>
+document.addEventListener('touchstart', ()=>{}, {passive:true});
+
+const SERVER_SNAPSHOT = [];
+
+function parseTS(s){const d=new Date(s);return isNaN(d)?null:d}
+function ISO(d){return d.toISOString()}
+function fmtDate(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fmtHM(d){return String(d.getHours()).padStart(2,'0')+":"+String(d.getMinutes()).padStart(2,'0')}
+function minutesBetween(a,b){return (b-a)/60000}
+function median(a){if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2}
+function mean(a){if(!a.length)return NaN;return a.reduce((x,y)=>x+y,0)/a.length}
+
+function dedupe(rec){const seen=new Set(),out=[];for(const r of rec){const k=ISO(new Date(r.timestamp))+"||"+(r.note||"");if(!seen.has(k)){seen.add(k);out.push(r)}}out.sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));return out}
+function normalize(rec){const out=[];for(const r of rec){let ts=r.timestamp, note=r.note||"";if(!ts && r.date){const t=(r.time||r.hour_minute||"00:00").replace(".",":");ts=r.date+" "+t}if(typeof ts==="string"&&/\d{1,2}\.\d{2}/.test(ts)){ts=ts.replace(".",":")}const d=parseTS(ts);if(d)out.push({timestamp:ISO(d),note:String(note)})}return dedupe(out)}
+
+const LS_KEY="cigtracker_data_v1";
+let DATA=null;try{const ls=localStorage.getItem(LS_KEY);if(ls)DATA=normalize(JSON.parse(ls))}catch(e){} if(!DATA)DATA=normalize(SERVER_SNAPSHOT);
+
+const $=id=>document.getElementById(id);
+const kToday=$("kpi_today"),kMean=$("kpi_mean"),kAvg=$("kpi_avg"),kMed=$("kpi_median"),kSince=$("kpi_since"),kTotal=$("kpi_total"),kDays=$("kpi_range_days");
+const rangeDays=$("rangeDays"),labelDays=$("labelDays");
+const noteInp=$("note"),btnAdd=$("btnAdd"),btnRecalc=$("btnRecalc"),btnPersist=$("btnPersist"),btnRestore=$("btnRestore");
+const fileInput=$("fileInput"),btnImport=$("btnImport");
+const dlCsv=$("dlCsv"),dlJson=$("dlJson"),dlTxt=$("dlTxt"),dlMd=$("dlMd");
+const fromDate=$("fromDate"),toDate=$("toDate"),btnFilter=$("btnFilter"),btnClear=$("btnClear");
+const tabCharts=$("tabCharts"),tabTable=$("tabTable"),tabIO=$("tabIO");
+const secCharts=$("secCharts"),secTable=$("secTable"),secIO=$("secIO");
+const tagbar=$("tagbar");
+
+function setTabs(sel){
+  const map = [[tabCharts,secCharts],[tabTable,secTable],[tabIO,secIO]];
+  for(const [t,s] of map){ const on = (t===sel); t.setAttribute('aria-selected', on?'true':'false'); s.classList.toggle('active',on); }
+}
+tabCharts.onclick=()=>setTabs(tabCharts);
+tabTable.onclick=()=>setTabs(tabTable);
+tabIO.onclick=()=>setTabs(tabIO);
+
+tagbar.addEventListener('click', (ev)=>{
+  const b = ev.target.closest('[data-tag]'); if(!b) return;
+  const t = b.getAttribute('data-tag'); if(!t) return;
+  if(noteInp.value.trim().length) noteInp.value += " ";
+  noteInp.value += t;
+  noteInp.focus();
+});
+
+btnPersist.onclick=()=>{localStorage.setItem(LS_KEY, JSON.stringify(DATA)); toast("Dati salvati nel browser");};
+btnRestore.onclick=()=>{DATA = normalize(SERVER_SNAPSHOT); redraw(); toast("Ripristinato dallo snapshot");};
+
+btnAdd.onclick=()=>{
+  DATA.push({timestamp:new Date().toISOString(), note: noteInp.value.trim()});
+  DATA = dedupe(DATA);
+  const addedNote = noteInp.value.trim();
+  noteInp.value="";
+  redraw(true);
+  rememberTagLast(addedNote);
+};
+
+function rememberTagLast(text){
+  const raw = (localStorage.getItem("ct_last_tags")||"").split("|").filter(Boolean);
+  const tokens = text ? text.split(/\s+/) : [];
+  const merged = Array.from(new Set(raw.concat(tokens))).slice(-4);
+  localStorage.setItem("ct_last_tags", merged.join("|"));
+  renderTagbar();
+}
+function renderTagbar(){
+  const raw = (localStorage.getItem("ct_last_tags")||"").split("|").filter(Boolean);
+  const base = ["100s","pre riunione","post pranzo"];
+  const tags = Array.from(new Set(base.concat(raw))).slice(-6);
+  tagbar.innerHTML = tags.map(t=>`<button class="tag" data-tag="${t.replace(/"/g,'&quot;')}">${t}</button>`).join("");
+}
+renderTagbar();
+
+btnFilter.onclick=()=>redraw();
+btnClear.onclick=()=>{fromDate.value="";toDate.value="";redraw()};
+
+rangeDays.addEventListener('input', ()=>{labelDays.textContent = rangeDays.value + " giorni";});
+btnRecalc.onclick=()=>redraw();
+
+function filterRangeDays(rec, days){ const cut = new Date(Date.now()-days*86400000); return rec.filter(r=>new Date(r.timestamp)>=cut); }
+function groupByDay(rec){ const m=new Map(); for(const r of rec){ const key = fmtDate(new Date(r.timestamp)); m.set(key,(m.get(key)||0)+1); } return [...m.entries()].map(([date,count])=>({date,count})).sort((a,b)=>a.date.localeCompare(b.date)); }
+function computeIntervals(rec){ const out=[]; for(let i=1;i<rec.length;i++){ const a=new Date(rec[i-1].timestamp), b=new Date(rec[i].timestamp); out.push({t:rec[i].timestamp, minutes:(b-a)/60000}); } return out; }
+function timeSinceLast(rec){ if(!rec.length) return "—"; const last=new Date(rec[rec.length-1].timestamp); const diff=Math.max(0,(Date.now()-last)/60000); const h=Math.floor(diff/60), m=Math.floor(diff%60); return h>0?`${h}h ${m}m`:`${m}m`; }
+
+function drawLineChart(canvas, series, options){
+  const ctx = canvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
+  if (canvas.width !== Math.round(cssW*DPR) || canvas.height !== Math.round(cssH*DPR)){
+    canvas.width = Math.round(cssW*DPR); canvas.height = Math.round(cssH*DPR);
+  }
+  const W = canvas.width, H = canvas.height;
+  ctx.scale(DPR, DPR);
+
+  ctx.clearRect(0,0,cssW,cssH);
+  if (!series.length){ ctx.fillStyle="#7a8aa0"; ctx.fillText("Nessun dato", 12, 20); return; }
+
+  const m = {l:46, r:10, t:10, b:28};
+  const xs = series.map(s=>s.x), ys = series.map(s=>s.y);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = 0, yMax = Math.max(...ys, 1);
+
+  const xTo = x => m.l + (x - xMin) / (xMax - xMin || 1) * (cssW - m.l - m.r);
+  const yTo = y => cssH - m.b - (y - yMin) / (yMax - yMin || 1) * (cssH - m.t - m.b);
+
+  ctx.strokeStyle = "#1f2a38"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let gy=0; gy<=4; gy++){ const y = yMin + gy*(yMax-yMin)/4; const py = yTo(y); ctx.moveTo(m.l, py); ctx.lineTo(cssW-m.r, py); }
+  ctx.stroke();
+
+  ctx.fillStyle="#9fb0c3"; ctx.font="12px system-ui";
+  for (let gy=0; gy<=4; gy++){ const y = yMin + gy*(yMax-yMin)/4; const py = yTo(y); ctx.fillText(String(Math.round(y)), 8, py+4); }
+
+  ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i=0;i<series.length;i++){ const px=xTo(series[i].x), py=yTo(series[i].y); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+  ctx.stroke();
+
+  ctx.fillStyle = "#22d3ee";
+  for (let i=0;i<series.length;i++){ const px=xTo(series[i].x), py=yTo(series[i].y); ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill(); }
+
+  canvas.onmousemove = (ev)=>{
+    const rect = canvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    let best=null, bestD=1e9;
+    for (let i=0;i<series.length;i++){ const px=xTo(series[i].x), py=yTo(series[i].y); const d2=(px-mx)**2 + (py-my)**2; if(d2<bestD){bestD=d2; best={i,px,py};} }
+    drawLineChart(canvas, series, options);
+    if(best && bestD<400){
+      const s=series[best.i];
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(best.px,best.py,4,0,Math.PI*2); ctx.fill();
+      const tip = options.formatTip ? options.formatTip(s) : (s.label+" — "+s.y);
+      const pad=6; ctx.font="12px system-ui"; const w=ctx.measureText(tip).width+pad*2, h=22;
+      let tx=best.px+8, ty=best.py-h-8; if(tx+w>cssW) tx=best.px-w-8; if(ty<0) ty=best.py+8;
+      ctx.fillStyle="#0c131e"; ctx.fillRect(tx,ty,w,h); ctx.strokeStyle="#22d3ee"; ctx.strokeRect(tx,ty,w,h); ctx.fillStyle="#e9eef5"; ctx.fillText(tip, tx+pad, ty+15);
+    }
+  };
+}
+
+function wireDownloads(rec){
+  const mk=(el, mime, txt)=>{ const blob=new Blob([txt], {type:mime}); el.href=URL.createObjectURL(blob); };
+  const toCSV = (records)=>{
+    const rows = [["timestamp","note"]].concat(records.map(r=>[new Date(r.timestamp).toISOString(), (r.note||"").replaceAll('"','""')]));
+    return rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
+  };
+  const toJSON = (records)=> JSON.stringify(records, null, 2);
+  const toTXT = (records)=> records.map(r=>`${new Date(r.timestamp).toISOString()} — ${r.note||""}`).join("\n");
+  const toMD  = (records)=>{
+    const rows = records.map(r=>`| ${fmtDate(new Date(r.timestamp))} | ${fmtHM(new Date(r.timestamp))} | ${(r.note||"").replaceAll("|","\\|")} |`).join("\n");
+    return `| Data | Ora | Nota |\n|---|---|---|\n` + rows;
+  };
+  mk(dlCsv, "text/csv", toCSV(rec));
+  mk(dlJson,"application/json", toJSON(rec));
+  mk(dlTxt, "text/plain", toTXT(rec));
+  mk(dlMd,  "text/markdown", toMD(rec));
+}
+
+function renderTable(records){
+  const rows = [];
+  for(let i=0;i<records.length;i++){
+    const d = new Date(records[i].timestamp);
+    const prev = i>0 ? new Date(records[i-1].timestamp) : null;
+    const mins = prev ? minutesBetween(prev,d) : NaN;
+    rows.push({date:fmtDate(d), time:fmtHM(d), note:records[i].note||"", mins: isNaN(mins)?"":mins.toFixed(1)});
+  }
+  const tbody = document.querySelector("#tbl tbody");
+  tbody.innerHTML = rows.map(r=>`<tr><td>${r.date}</td><td>${r.time}</td><td>${(r.note||"").replace(/</g,"&lt;")}</td><td>${r.mins}</td></tr>`).join("");
+}
+
+function redraw(scrolled=false){
+  DATA = dedupe(DATA);
+  const days = Math.max(7, Math.min(180, parseInt(rangeDays.value||30)));
+  kDays.textContent = String(days);
+
+  const now = new Date();
+  const todayStr = fmtDate(now);
+  const todayCount = DATA.filter(r => fmtDate(new Date(r.timestamp)) === todayStr).length;
+  kToday.textContent = String(todayCount);
+
+  const sel = filterRangeDays(DATA, days);
+  const daily = groupByDay(sel);
+  const meanPerDay = daily.length ? (daily.reduce((a,b)=>a+b.count,0) / daily.length) : 0;
+  kMean.textContent = meanPerDay.toFixed(2);
+
+  const intervalsAll = computeIntervals(sel);
+  const ivals = intervalsAll.map(x=>x.minutes).filter(x=>isFinite(x) && x>=0);
+  const avg = ivals.length ? mean(ivals) : NaN;
+  const med = median(ivals);
+  kAvg.textContent = isFinite(avg) ? avg.toFixed(1)+"m" : "—";
+  kMed.textContent = isFinite(med) ? med.toFixed(1)+"m" : "—";
+  kSince.textContent = timeSinceLast(DATA);
+  kTotal.textContent = String(DATA.length);
+
+  const c1 = $("chartDaily"), c2 = $("chartIntervals");
+  const serDaily = daily.map(d => ({ x: new Date(d.date).getTime(), y: d.count, label: d.date }));
+  drawLineChart(c1, serDaily, { formatTip: s => new Date(s.x).toLocaleDateString() + " — " + s.y });
+
+  const serIvals = intervalsAll.map(p => ({ x: new Date(p.t).getTime(), y: p.minutes, label: new Date(p.t).toLocaleString() }));
+  drawLineChart(c2, serIvals, { formatTip: s => new Date(s.x).toLocaleString() + " — " + s.y.toFixed(1) + " min" });
+
+  let filtered = [...DATA];
+  if (fromDate.value){ const fd = new Date(fromDate.value); filtered = filtered.filter(r => new Date(r.timestamp) >= fd); }
+  if (toDate.value){ const td = new Date(toDate.value); filtered = filtered.filter(r => new Date(r.timestamp) <= new Date(td.getTime() + 86400000 - 1)); }
+  renderTable(filtered);
+
+  wireDownloads(DATA);
+
+  if (scrolled){ toast("Registrata"); }
+}
+
+let toastTimer=null;
+function toast(msg){
+  let el = document.getElementById("toast");
+  if(!el){
+    el = document.createElement("div");
+    el.id="toast";
+    Object.assign(el.style,{position:"fixed",left:"50%",bottom:`calc(70px + env(safe-area-inset-bottom))`,transform:"translateX(-50%)",background:"#0e1624",color:"#e9eef5",border:"1px solid var(--line)",padding:"10px 14px",borderRadius:"999px",zIndex:50,boxShadow:"var(--shadow)",opacity:0,transition:"opacity .2s"});
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = 1;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.style.opacity=0; }, 1200);
+}
+
+let resizeTO=null;
+window.addEventListener('resize', ()=>{ clearTimeout(resizeTO); resizeTO=setTimeout(()=>redraw(), 150); });
+
+btnImport.onclick = async ()=>{
+  const f = fileInput.files && fileInput.files[0];
+  if(!f){ toast("Seleziona un file"); return; }
+  const txt = await f.text();
+  let recs = [];
+  try{
+    if (f.name.toLowerCase().endsWith(".json")) recs = JSON.parse(txt);
+    else if (f.name.toLowerCase().endsWith(".csv")) recs = parseCSV(txt);
+    else if (f.name.toLowerCase().endsWith(".md")) recs = parseMD(txt);
+    else recs = parseTXT(txt);
+  }catch(e){ toast("Formato non riconosciuto"); return; }
+  DATA = dedupe(DATA.concat(normalize(recs)));
+  redraw();
+  toast("Import completato");
+};
+
+function parseCSV(s){
+  const lines = s.split(/\r?\n/).filter(x=>x.trim().length);
+  if (!lines.length) return [];
+  const header = lines[0].split(",").map(h=>h.trim().replace(/^"+|"+$/g,"").toLowerCase());
+  const idx = (name)=> header.indexOf(name);
+  const out = [];
+  for (let i=1;i<lines.length;i++){
+    const cols = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(x=>x.replace(/^"+|"+$/g,""));
+    const rec = {
+      timestamp: cols[idx("timestamp")] || "",
+      date: cols[idx("date")] || "",
+      time: cols[idx("time")] || cols[idx("hour_minute")] || "",
+      note: cols[idx("note")] || ""
+    };
+    out.push(rec);
+  }
+  return out;
+}
+function parseTXT(s){
+  return s.split(/\r?\n/).map(ln => {
+    const m = ln.match(/^(\S+)\s+[—-]\s+(.*)$/);
+    if (m) return { timestamp: m[1], note: m[2] };
+    return { timestamp: ln.trim() };
+  }).filter(r=>r.timestamp);
+}
+function parseMD(s){
+  const out = [];
+  const lines = s.split(/\r?\n/).slice(2);
+  for (const ln of lines){
+    const parts = ln.split("|").map(x=>x.trim());
+    if (parts.length >= 4){
+      const [_, data, ora, nota] = parts;
+      out.push({ date: data, time: ora, note: nota });
+    }
+  }
+  return out;
+}
+
+redraw();
+</script>
+</body>
+</html>
