@@ -18,25 +18,22 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:clamp(14px,2.8vw,16px)}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:clamp(14px,1.8vw,20px)}
 header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0d1420, #0d1420cc 70%, transparent);backdrop-filter:saturate(1.2) blur(4px);padding:calc(var(--pad)/1.5) var(--pad);border-bottom:1px solid var(--line)}
-h1{margin:0;font-size:clamp(16px,4.2vw,20px);font-weight:700}
+h1{margin:0;font-size:clamp(20px,3.5vw,32px);font-weight:700}
 .small{color:var(--muted);font-size:.9em}
 main{padding:var(--pad);padding-bottom:calc(84px + var(--safe-b));max-width:1000px;margin:0 auto}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:72px;display:flex;flex-direction:column;justify-content:center}
 .kpi .v{font-size:clamp(18px,5.5vw,24px);font-weight:800;letter-spacing:.2px}
 .kpi .l{font-size:.9em;color:var(--muted)}
-
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad)}
 .tabs{display:flex;gap:8px;margin:12px 0}
 .tab{flex:1;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;height:var(--tap);background:#0e1520;color:var(--ink)}
 .tab[aria-selected="true"]{outline:2px solid var(--acc);background:#0f1928}
 .section{display:none}
 .section.active{display:block}
-
-canvas{width:100%;height:260px;background:#0d1420;border:1px solid var(--line);border-radius:12px}
-@media (min-width:700px){ canvas{height:340px} }
+canvas{width:100%;height:clamp(220px,40vh,400px);background:#0d1420;border:1px solid var(--line);border-radius:12px}
 
 .table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:60vh;border:1px solid var(--line);border-radius:12px}
 table{width:100%;border-collapse:collapse;min-width:520px;background:#0d1420}
@@ -285,7 +282,8 @@ function drawLineChart(canvas, series, options){
   for (let gy=0; gy<=4; gy++){ const y = yMin + gy*(yMax-yMin)/4; const py = yTo(y); ctx.moveTo(m.l, py); ctx.lineTo(cssW-m.r, py); }
   ctx.stroke();
 
-  ctx.fillStyle="#9fb0c3"; ctx.font="12px system-ui";
+  const font = Math.max(12, parseFloat(getComputedStyle(document.body).fontSize) * 0.85);
+  ctx.fillStyle="#9fb0c3"; ctx.font=`${font}px system-ui`;
   for (let gy=0; gy<=4; gy++){ const y = yMin + gy*(yMax-yMin)/4; const py = yTo(y); ctx.fillText(String(Math.round(y)), 8, py+4); }
 
   ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 2;
@@ -306,9 +304,9 @@ function drawLineChart(canvas, series, options){
       const s=series[best.i];
       ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(best.px,best.py,4,0,Math.PI*2); ctx.fill();
       const tip = options.formatTip ? options.formatTip(s) : (s.label+" — "+s.y);
-      const pad=6; ctx.font="12px system-ui"; const w=ctx.measureText(tip).width+pad*2, h=22;
+      const pad=6; ctx.font=`${font}px system-ui`; const w=ctx.measureText(tip).width+pad*2, h=font+10;
       let tx=best.px+8, ty=best.py-h-8; if(tx+w>cssW) tx=best.px-w-8; if(ty<0) ty=best.py+8;
-      ctx.fillStyle="#0c131e"; ctx.fillRect(tx,ty,w,h); ctx.strokeStyle="#22d3ee"; ctx.strokeRect(tx,ty,w,h); ctx.fillStyle="#e9eef5"; ctx.fillText(tip, tx+pad, ty+15);
+      ctx.fillStyle="#0c131e"; ctx.fillRect(tx,ty,w,h); ctx.strokeStyle="#22d3ee"; ctx.strokeRect(tx,ty,w,h); ctx.fillStyle="#e9eef5"; ctx.fillText(tip, tx+pad, ty+font+4);
     }
   };
 }
