@@ -263,8 +263,8 @@ function drawLineChart(canvas, series, options){
   if (canvas.width !== Math.round(cssW*DPR) || canvas.height !== Math.round(cssH*DPR)){
     canvas.width = Math.round(cssW*DPR); canvas.height = Math.round(cssH*DPR);
   }
-  const W = canvas.width, H = canvas.height;
-  ctx.scale(DPR, DPR);
+  // reset any existing transforms to avoid cumulative scaling on redraws
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
   ctx.clearRect(0,0,cssW,cssH);
   if (!series.length){ ctx.fillStyle="#7a8aa0"; ctx.fillText("Nessun dato", 12, 20); return; }
