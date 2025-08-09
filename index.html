@@ -152,7 +152,7 @@ footer{color:var(--muted);text-align:center;padding:24px}
 <script>
 document.addEventListener('touchstart', ()=>{}, {passive:true});
 
-const SERVER_SNAPSHOT = [];
+let SERVER_SNAPSHOT = [];
 
 function parseTS(s){const d=new Date(s);return isNaN(d)?null:d}
 function ISO(d){return d.toISOString()}
@@ -166,7 +166,7 @@ function dedupe(rec){const seen=new Set(),out=[];for(const r of rec){const k=ISO
 function normalize(rec){const out=[];for(const r of rec){let ts=r.timestamp, note=r.note||"";if(!ts && r.date){const t=(r.time||r.hour_minute||"00:00").replace(".",":");ts=r.date+" "+t}if(typeof ts==="string"&&/\d{1,2}\.\d{2}/.test(ts)){ts=ts.replace(".",":")}const d=parseTS(ts);if(d)out.push({timestamp:ISO(d),note:String(note)})}return dedupe(out)}
 
 const LS_KEY="cigtracker_data_v1";
-let DATA=null;try{const ls=localStorage.getItem(LS_KEY);if(ls)DATA=normalize(JSON.parse(ls))}catch(e){} if(!DATA)DATA=normalize(SERVER_SNAPSHOT);
+let DATA=null;
 
 const $=id=>document.getElementById(id);
 const kToday=$("kpi_today"),kMean=$("kpi_mean"),kAvg=$("kpi_avg"),kMed=$("kpi_median"),kSince=$("kpi_since"),kTotal=$("kpi_total"),kDays=$("kpi_range_days");
@@ -195,16 +195,42 @@ tagbar.addEventListener('click', (ev)=>{
   noteInp.focus();
 });
 
-btnPersist.onclick=()=>{localStorage.setItem(LS_KEY, JSON.stringify(DATA)); toast("Dati salvati nel browser");};
-btnRestore.onclick=()=>{DATA = normalize(SERVER_SNAPSHOT); redraw(); toast("Ripristinato dallo snapshot");};
+btnPersist.onclick=async ()=>{
+  localStorage.setItem(LS_KEY, JSON.stringify(DATA));
+  try{
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(DATA)
+    });
+  }catch(e){ console.warn('Save failed', e); }
+  toast("Dati salvati");
+};
+btnRestore.onclick=async ()=>{
+  try{
+    const resp = await fetch('/api/data');
+    if(resp.ok) SERVER_SNAPSHOT = await resp.json();
+  }catch(e){ console.warn('Restore failed', e); }
+  DATA = normalize(SERVER_SNAPSHOT);
+  redraw();
+  toast("Ripristinato dallo snapshot");
+};
 
-btnAdd.onclick=()=>{
-  DATA.push({timestamp:new Date().toISOString(), note: noteInp.value.trim()});
+btnAdd.onclick=async ()=>{
+  const rec = {timestamp:new Date().toISOString(), note: noteInp.value.trim()};
+  DATA.push(rec);
   DATA = dedupe(DATA);
   const addedNote = noteInp.value.trim();
   noteInp.value="";
   redraw(true);
   rememberTagLast(addedNote);
+  try{
+    await fetch('/api/add', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(rec)
+    });
+  }catch(e){ console.warn('Add failed', e); }
 };
 
 function rememberTagLast(text){
@@ -430,7 +456,20 @@ function parseMD(s){
   return out;
 }
 
-redraw();
+async function init(){
+  try{
+    const resp = await fetch('/api/data');
+    if(resp.ok) SERVER_SNAPSHOT = await resp.json();
+  }catch(e){ console.warn('Init fetch failed', e); }
+  try{
+    const ls = localStorage.getItem(LS_KEY);
+    if(ls) DATA = normalize(JSON.parse(ls));
+  }catch(e){}
+  if(!DATA) DATA = normalize(SERVER_SNAPSHOT);
+  redraw();
+}
+
+init();
 </script>
 </body>
 </html>
