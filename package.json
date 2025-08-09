@@ -1,0 +1,17 @@
+{
+  "name": "stopsmoking",
+  "version": "1.0.0",
+  "description": "Programma per smettere di fumare",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node -e \"console.log('No tests specified')\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
